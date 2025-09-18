@@ -91,3 +91,103 @@ func (uh *UserHandler) GetUser(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, user)
 }
+
+func (uh *UserHandler) UpdateUserHandler(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+
+	userID, err := strconv.Atoi(idStr)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
+		return
+	}
+
+	existingUser, err := uh.userRepo.GetUserByID(ctx.Request.Context(), userID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch user"})
+		return
+	}
+
+	var req struct {
+		Name     string `json:"name"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	if req.Name != "" {
+		existingUser.Name = req.Name
+	}
+	if req.Email != "" {
+		existingUser.Email = req.Email
+	}
+	if req.Password != "" {
+		hashPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+		if err != nil {
+			log.Printf("Error hashing password: %v", err)
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
+			return
+		}
+		existingUser.Password = string(hashPassword)
+	}
+
+	if err := uh.userRepo.UpdateUser(ctx.Request.Context(), existingUser); err != nil {
+		if err == sql.ErrNoRows {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+			return
+		}
+		log.Printf("Error updating user: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not update user"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "user updated successfully",
+		"user": gin.H{
+			"id":    existingUser.ID,
+			"name":  existingUser.Name,
+			"email": existingUser.Email,
+		},
+	})
+}
+
+func (uh *UserHandler) DeleteUserHandler(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+
+	userID, err := strconv.Atoi(idStr)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
+		return
+	}
+
+	_, err = uh.userRepo.GetUserByID(ctx.Request.Context(), userID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch user"})
+		return
+	}
+
+	if err := uh.userRepo.DeleteUser(ctx.Request.Context(), userID); err != nil {
+		if err == sql.ErrNoRows {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+			return
+		}
+		log.Printf("Error deleting user: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not delete user"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "user deleted successfully",
+	})
+}

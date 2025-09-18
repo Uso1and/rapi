@@ -9,6 +9,8 @@ import (
 type UserRepoInterfase interface {
 	CreateUser(ctx context.Context, user *models.User) error
 	GetUserByID(ctx context.Context, id int) (*models.User, error)
+	UpdateUser(ctx context.Context, user *models.User) error
+	DeleteUser(ctx context.Context, ID int) error
 }
 
 type UserRepo struct {
@@ -46,4 +48,50 @@ func (ur *UserRepo) GetUserByID(ctx context.Context, id int) (*models.User, erro
 	}
 
 	return user, nil
+}
+
+func (ur *UserRepo) UpdateUser(ctx context.Context, user *models.User) error {
+	query := `UPDATE users SET name=$1, email=$2, password=$3, created_at=$4 WHERE id=$5`
+
+	res, err := ur.db.ExecContext(ctx, query,
+		user.Name,
+		user.Email,
+		user.Password,
+		user.CreatedAt,
+		user.ID,
+	)
+	if err != nil {
+		return err
+	}
+
+	rowAff, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowAff == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
+}
+
+func (ur *UserRepo) DeleteUser(ctx context.Context, ID int) error {
+	query := `DELETE FROM users WHERE id=$1`
+
+	result, err := ur.db.ExecContext(ctx, query, ID)
+
+	if err != nil {
+		return err
+	}
+
+	rowAff, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowAff == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }

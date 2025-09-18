@@ -23,7 +23,8 @@ func PubRoutSetup() *gin.Engine {
 	r.GET("/", handlers.IndexPageHandler)
 
 	r.POST("/reg", userHandler.CreateUserHandler) //Create user
-	r.GET("/user/:id", userHandler.GetUser)
-
+	r.GET("/user/:id", userHandler.GetUser)       //Get user
+	r.PUT("/user/:id", userHandler.UpdateUserHandler)
+	r.DELETE("/user/:id", userHandler.DeleteUserHandler)
 	return r
 }
